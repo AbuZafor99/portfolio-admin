@@ -36,6 +36,7 @@
     loginScreen.style.display = 'none';
     dashboard.hidden = false;
     openTab('profile');
+    refreshMsgBadge();
   }
   function logout() {
     token = '';
@@ -304,7 +305,18 @@
     if (tab === 'profile') return renderProfile();
     if (tab === 'cv') return renderCV();
     if (tab === 'account') return renderAccount();
+    if (tab === 'messages') return renderMessages();
+    if (tab === 'analytics') return renderAnalytics();
     renderResource(tab);
+  }
+
+  function timeAgo(iso) {
+    var s = (Date.now() - new Date(iso).getTime()) / 1000;
+    if (s < 60) return 'just now';
+    if (s < 3600) return Math.floor(s / 60) + 'm ago';
+    if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+    if (s < 2592000) return Math.floor(s / 86400) + 'd ago';
+    return new Date(iso).toLocaleDateString();
   }
 
   /* ---------- Profile tab ---------- */
@@ -445,6 +457,116 @@
         }).catch(function (e) { toast(e.message, true); renderCV(); });
       }
     });
+  }
+
+  /* ---------- Messages tab ---------- */
+  function renderMessages() {
+    loading();
+    api('/api/messages').then(function (items) {
+      main.innerHTML = pageHead('Messages', 'Contact form submissions from abuzafor.me.') +
+        (items.length ? '<div class="msg-grid" id="msgGrid"></div>' : '<div class="msg-empty"><i class="fas fa-inbox"></i>No messages yet.</div>');
+      var grid = $('#msgGrid');
+      if (!grid) return;
+      items.forEach(function (m) {
+        var card = document.createElement('div');
+        card.className = 'msg-card' + (m.read ? '' : ' unread');
+        card.innerHTML =
+          '<div class="msg-name">' + esc(m.name) + '</div>' +
+          '<div class="msg-email">' + esc(m.email) + '</div>' +
+          (m.subject ? '<div class="msg-subject">' + esc(m.subject) + '</div>' : '') +
+          '<div class="msg-preview">' + esc(m.message) + '</div>' +
+          '<div class="msg-date">' + timeAgo(m.createdAt) + '</div>';
+        card.addEventListener('click', function () { openMessage(m, card); });
+        grid.appendChild(card);
+      });
+    }).catch(function (e) { main.innerHTML = pageHead('Messages', '') + '<div class="panel">' + esc(e.message) + '</div>'; });
+  }
+
+  function openMessage(m, card) {
+    var modal = $('#msgModal');
+    $('#msgModalName').textContent = m.name;
+    $('#msgModalMeta').innerHTML = '<a href="mailto:' + esc(m.email) + '">' + esc(m.email) + '</a>' +
+      (m.subject ? ' · ' + esc(m.subject) : '') + ' · ' + new Date(m.createdAt).toLocaleString();
+    $('#msgModalBody').textContent = m.message;
+    $('#msgModalReply').href = 'mailto:' + encodeURIComponent(m.email) + '?subject=' + encodeURIComponent('Re: ' + (m.subject || 'Your message'));
+    modal.classList.add('open');
+
+    if (!m.read) {
+      api('/api/messages/' + m._id + '/read', { method: 'PATCH', body: JSON.stringify({ read: true }) })
+        .then(function () { m.read = true; if (card) card.classList.remove('unread'); refreshMsgBadge(); })
+        .catch(function () { /* non-critical */ });
+    }
+
+    $('#msgModalDelete').onclick = function () {
+      if (!confirm('Delete this message? This cannot be undone.')) return;
+      api('/api/messages/' + m._id, { method: 'DELETE' }).then(function () {
+        toast('Message deleted');
+        modal.classList.remove('open');
+        if (card) card.remove();
+        refreshMsgBadge();
+      }).catch(function (e) { toast(e.message, true); });
+    };
+  }
+
+  function closeMsgModal() { $('#msgModal').classList.remove('open'); }
+
+  function refreshMsgBadge() {
+    if (!token) return;
+    api('/api/messages').then(function (items) {
+      var unread = items.filter(function (m) { return !m.read; }).length;
+      var badge = $('#msgBadge');
+      if (unread > 0) { badge.textContent = unread; badge.hidden = false; }
+      else badge.hidden = true;
+    }).catch(function () { /* non-critical */ });
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var m = $('#msgModal');
+    if (!m) return;
+    m.addEventListener('click', function (e) { if (e.target === m) closeMsgModal(); });
+    $('#msgModalClose').addEventListener('click', closeMsgModal);
+  });
+
+  /* ---------- Analytics tab ---------- */
+  function renderAnalytics() {
+    loading();
+    api('/api/analytics/summary?days=30').then(function (d) {
+      var daily = d.daily || [];
+      var maxDay = daily.reduce(function (m, x) { return Math.max(m, x.count); }, 1);
+      var bars = daily.map(function (x) {
+        var h = Math.max(3, Math.round((x.count / maxDay) * 100));
+        var dayLabel = new Date(x.day + 'T00:00:00').toLocaleDateString('en', { month: 'short', day: 'numeric' });
+        return '<div class="an-bar-wrap" title="' + x.count + ' visits on ' + esc(x.day) + '">' +
+          '<span class="an-bar-count">' + x.count + '</span>' +
+          '<div class="an-bar" style="height:' + h + '%;"></div>' +
+          '<span class="an-bar-day">' + dayLabel + '</span></div>';
+      }).join('');
+
+      var countries = d.countries || [];
+      var maxC = countries.reduce(function (m, c) { return Math.max(m, c.count); }, 1);
+      var countryRows = countries.map(function (c) {
+        var pct = Math.max(2, Math.round((c.count / maxC) * 100));
+        return '<div class="an-country-row"><div class="an-country-name">' + esc(c.country || 'Unknown') + '</div>' +
+          '<div class="an-country-bar-track"><div class="an-country-bar" style="width:' + pct + '%;"></div></div>' +
+          '<div class="an-country-count">' + c.count + '</div></div>';
+      }).join('') || '<p style="color:var(--muted);font-size:.85rem;">No visits recorded yet.</p>';
+
+      var recentRows = (d.recent || []).map(function (r) {
+        return '<tr><td>' + new Date(r.createdAt).toLocaleString() + '</td><td class="path">' + esc(r.path || '/') + '</td>' +
+          '<td>' + esc(r.city ? r.city + ', ' : '') + esc(r.country || 'Unknown') + '</td></tr>';
+      }).join('') || '<tr><td colspan="3" style="color:var(--dim);">No visits yet.</td></tr>';
+
+      main.innerHTML = pageHead('Analytics', 'Visitor traffic on abuzafor.me — no cookies, only aggregate country + page data.') +
+        '<div class="an-stats">' +
+        '<div class="an-stat"><div class="num">' + d.totalInRange + '</div><div class="lbl">Last 30 Days</div></div>' +
+        '<div class="an-stat"><div class="num">' + d.totalAllTime + '</div><div class="lbl">All Time</div></div>' +
+        '<div class="an-stat"><div class="num">' + countries.length + '</div><div class="lbl">Countries</div></div>' +
+        '</div>' +
+        '<div class="panel"><h3><i class="fas fa-calendar-day"></i> Daily Visits (last 30 days)</h3>' +
+        (daily.length ? '<div class="an-chart">' + bars + '</div>' : '<p style="color:var(--muted);font-size:.85rem;">No visits recorded yet.</p>') + '</div>' +
+        '<div class="panel"><h3><i class="fas fa-globe"></i> By Country</h3><div class="an-country-list">' + countryRows + '</div></div>' +
+        '<div class="panel"><h3><i class="fas fa-clock"></i> Recent Visits</h3><div class="an-recent-wrap"><table class="an-recent"><thead><tr><th>When</th><th>Page</th><th>Location</th></tr></thead><tbody>' + recentRows + '</tbody></table></div></div>';
+    }).catch(function (e) { main.innerHTML = pageHead('Analytics', '') + '<div class="panel">' + esc(e.message) + '</div>'; });
   }
 
   /* ---------- Account tab ---------- */
