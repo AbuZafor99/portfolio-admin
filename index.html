@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Admin | Abu Zafor Portfolio</title>
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+    <!-- Login screen -->
+    <div id="loginScreen" class="login-screen">
+        <form id="loginForm" class="login-card">
+            <div class="login-logo">&lt;<span>Zafor</span>/&gt;</div>
+            <h1>Admin Portal</h1>
+            <p class="login-sub">Sign in to manage your portfolio content</p>
+            <div class="fg" id="apiUrlField" hidden><label>API URL</label><input type="url" id="apiUrlInput" placeholder="https://your-api.azurewebsites.net"></div>
+            <div class="fg"><label>Email</label><input type="email" id="loginEmail" autocomplete="username" required></div>
+            <div class="fg"><label>Password</label><input type="password" id="loginPassword" autocomplete="current-password" required></div>
+            <button type="submit" class="btn-p" id="loginBtn"><i class="fas fa-sign-in-alt"></i> Sign In</button>
+            <div class="login-error" id="loginError"></div>
+            <div class="api-hint" id="apiHint"></div>
+        </form>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="dashboard" class="dashboard" hidden>
+        <aside class="sidebar">
+            <div class="side-logo">&lt;<span>Zafor</span>/&gt; <em>admin</em></div>
+            <nav id="sideNav">
+                <button class="side-link active" data-tab="profile"><i class="fas fa-user"></i> Profile &amp; About</button>
+                <button class="side-link" data-tab="projects"><i class="fas fa-rocket"></i> Projects</button>
+                <button class="side-link" data-tab="skills"><i class="fas fa-layer-group"></i> Skills</button>
+                <button class="side-link" data-tab="experiences"><i class="fas fa-briefcase"></i> Experience</button>
+                <button class="side-link" data-tab="education"><i class="fas fa-graduation-cap"></i> Education</button>
+                <button class="side-link" data-tab="certifications"><i class="fas fa-certificate"></i> Certifications</button>
+                <button class="side-link" data-tab="cv"><i class="fas fa-file-pdf"></i> CV / Resume</button>
+                <button class="side-link" data-tab="account"><i class="fas fa-key"></i> Account</button>
+            </nav>
+            <div class="side-foot">
+                <a href="https://abuzafor.me" id="viewSiteLink" target="_blank" rel="noopener"><i class="fas fa-external-link-alt"></i> View Site</a>
+                <button id="logoutBtn"><i class="fas fa-sign-out-alt"></i> Logout</button>
+            </div>
+        </aside>
+        <main class="main" id="mainContent"></main>
+    </div>
+
+    <div class="toast" id="toast"></div>
+    <script src="config.js"></script>
+    <script src="admin.js"></script>
+</body>
+</html>
